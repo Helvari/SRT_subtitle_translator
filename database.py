@@ -14,8 +14,8 @@ class DatabaseConnection:
 
 
 class DatabaseManager:
-    def __init__(self, db_path):
-        self.update_translations = None
+    def __init__(self, db_path, overwrite_translations):
+        self.overwrite_translations = overwrite_translations
         self.db_path = db_path
 
     def create_table(self):
@@ -63,11 +63,11 @@ class DatabaseManager:
         except Exception as e:
             print(f"Virhe datan tallentamisessa tietokantaan: {e}")
 
-    def fetch_rows_to_translate(self, start_index, end_index):
+    def fetch_rows_to_translate(self, start_index, end_index, overwrite_translations):
         try:
             with DatabaseConnection(self.db_path) as conn:
                 cursor = conn.cursor()
-                if self.update_translations:
+                if overwrite_translations:
                     cursor.execute('''
                         SELECT subtitle_index, original_text
                         FROM translations
@@ -118,11 +118,13 @@ class DatabaseManager:
             return None
 
     def update_database(self, translations, update_translations):
+        # print(f"Updating database with update_translations={update_translations}")
         try:
             with DatabaseConnection(self.db_path) as conn:
                 cursor = conn.cursor()
                 for subtitle_index, translated_text in translations:
                     if update_translations:
+                        # print(f"Updating subtitle_index={subtitle_index} with new translation")
                         # Päivitetään kaikki käännökset
                         cursor.execute('''
                             UPDATE translations
@@ -130,6 +132,7 @@ class DatabaseManager:
                             WHERE subtitle_index = ?;
                         ''', (translated_text, subtitle_index))
                     else:
+                        # print(f"Writing new translation only for subtitle_index={subtitle_index}")
                         # Päivitetään vain uudet käännökset
                         cursor.execute('''
                             UPDATE translations

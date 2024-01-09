@@ -8,8 +8,7 @@ client = openai.OpenAI()
 
 
 class Translator:
-    def __init__(self, file_path, target_lang=None, index_range=None, batch_size=5,
-                 update_translations=False):
+    def __init__(self, file_path, target_lang=None, index_range=None, batch_size=5, overwrite_translations=False):
 
         folder_path = os.path.dirname(file_path)
         base_name = os.path.splitext(os.path.basename(file_path))[0]
@@ -18,13 +17,13 @@ class Translator:
 
         self.file_path = file_path
         self.target_lang = target_lang
-        self.update_translations = update_translations
+        self.overwrite_translations = overwrite_translations
         self.index_range = index_range
         self.batch_size = batch_size
         self.failed_translations = []
 
         # Luo DatabaseManager-olio ja tarkista tietokannan olemassaolo
-        self.database_manager = DatabaseManager(self.db_path)
+        self.database_manager = DatabaseManager(self.db_path, self.overwrite_translations)
 
         if not self.database_manager.check_if_table_exists():
             # Luo tietokanta ja taulu, jos sitä ei ole vielä olemassa
@@ -159,13 +158,16 @@ class Translator:
         while True:
             index_range_input = input(
                 f"Enter index range in format 'start-end' (default {default_index_range}): ").strip()
-            batch_size_input = input("Enter the batch size (default 5): ").strip()
-            update_translations_input = input("Do you want to update already translated texts? (y/n): ").lower()
-
-            # Asetetaan oletusarvot, jos syötettä ei annettu
             index_range = index_range_input if index_range_input else default_index_range
+            print(f"Setting index_range to {index_range}\n")
+
+            batch_size_input = input("Enter the batch size (default 5): ").strip()
             batch_size = int(batch_size_input) if batch_size_input.isdigit() else 5
-            update_translations = update_translations_input == 'y'
+            print(f"Setting batch_size to {batch_size}\n")
+
+            overwrite_translations_input = input("Do you want to update already translated texts? (y/n): ").lower()
+            overwrite_translations = overwrite_translations_input == 'y'
+            print(f"Setting overwrite_translations to {overwrite_translations}\n")
 
             if '-' in index_range:
                 # Jos käyttäjän antama arvo on indeksiväli, kutsutaan process_index_range-funktiota.
@@ -178,7 +180,7 @@ class Translator:
                 if self.check_single_index(index_range):
                     break
 
-        return index_range, batch_size, update_translations
+        return index_range, batch_size, overwrite_translations
 
     def check_index_range(self, index_range):
         max_index = self.database_manager.get_max_subtitle_index()
@@ -207,7 +209,7 @@ class Translator:
             print("Invalid index. Please enter a valid single index.")
             return False
 
-    def set_parameters(self, index_range, batch_size, update_translations):
+    def set_parameters(self, index_range, batch_size, overwrite_translations):
         self.index_range = []
         for part in index_range.split(','):
             part = part.strip()
@@ -222,15 +224,9 @@ class Translator:
                     print(f"Invalid index: {part}")
 
         self.batch_size = batch_size
-        self.update_translations = update_translations
+        self.overwrite_translations = overwrite_translations
 
-
-
-    def commit_translations_to_db(self, translations_to_update):
-        # Kutsu yleistä päivitysmetodia update_database
-        self.database_manager.update_database(translations_to_update, self.update_translations)
-
-    def process_and_translate_range(self, start_index, end_index, batch_size):
+    def process_and_translate_range(self, start_index, end_index, batch_size, overwrite_translations):
         current_index = start_index
         commit_interval = 50
         translations_count = 0
@@ -240,8 +236,9 @@ class Translator:
             next_index = min(current_index + batch_size - 1, end_index)
             print(f"Käännös riveille {current_index}-{next_index}...")
 
-            # Hae rivit riippuen update_translations-arvosta
-            rows_to_translate = self.database_manager.fetch_rows_to_translate(current_index, next_index)
+            # Hae rivit riippuen overwrite_translations-arvosta
+            rows_to_translate = self.database_manager.fetch_rows_to_translate(current_index, next_index, self.overwrite_translations)
+            # print(rows_to_translate)
 
             # Suorita käännökset ja kerää niiden tiedot
             for subtitle_index, original_text in rows_to_translate:
@@ -250,7 +247,7 @@ class Translator:
 
                 translations_count += 1
                 if translations_count >= commit_interval or next_index == end_index:
-                    self.commit_translations_to_db(translations_to_update)
+                    self.database_manager.update_database(translations_to_update, overwrite_translations)
                     translations_to_update = []  # Tyhjennä lista uusia käännöksiä varten
                     translations_count = 0
 
@@ -258,29 +255,29 @@ class Translator:
 
         # Päivitä jäljelle jäävät käännökset
         if translations_to_update:
-            self.commit_translations_to_db(translations_to_update)
+            self.database_manager.update_database(translations_to_update)
 
-    def process_srt(self):
+    def process_srt(self, overwrite_translations):
+        # Print a message indicating the start of the translation process.
         print("\nAloitetaan kääntäminen...\n")
 
         try:
-            # 1. Tarkista indeksiväli
-            if not self.index_range:
-                # Laske oletusarvoinen indeksiväli, jos sitä ei ole annettu
-                start_index, end_index = self.calculate_default_index_range(self.db_path)
-                self.index_range = [f"{start_index}-{end_index}"]  # Lisää oletusarvoinen indeksiväli listaan
-
-            # 2. Käännä ja päivitä tietokanta erittäin annetun indeksivälin ja batch_size:n mukaan
+            # Iterate through each index range specified in self.index_range.
             for index_range in self.index_range:
+                # Split the index range string into start and end indexes and convert them to integers.
                 start_index, end_index = map(int, index_range.split('-'))
+                # Print a message indicating the current index range being processed.
                 print(f"Käsitellään indeksiväliä {start_index}-{end_index}...\n")
+                # Process and translate the subtitles for the current index range.
                 self.process_and_translate_range(start_index, end_index,
-                                                 self.batch_size)
+                                                 self.batch_size, overwrite_translations)
 
-            # 3. Luo uusi .srt-tiedosto käännetyillä tekstityksillä
+            # Create a new .srt file with the translated subtitles.
             self.create_translated_srt()
 
+            # Print a list of indexes where translations failed.
             print("Virheelliset käännökset: " + ', '.join(self.failed_translations))
 
         except ValueError:
+            # Print an error message if an invalid input is encountered.
             print("Virheellinen syöte.")
