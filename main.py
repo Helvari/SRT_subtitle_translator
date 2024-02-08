@@ -4,10 +4,8 @@ from translator import Translator
 
 
 def main():
-    # Lataa .env-tiedoston ympäristömuuttujat
     load_dotenv()
 
-    # Hae file_path .env-tiedostosta
     file_path = os.getenv('FILE_PATH')
     target_lang = "fin"
 
@@ -17,6 +15,11 @@ def main():
     translator.set_parameters(index_range, batch_size, overwrite_translations)
     translator.process_srt(overwrite_translations)
 
+    pass
+
 
 if __name__ == "__main__":
-    main()
+    while True:
+        main()
+        if input("Type 'quit' to exit: ").lower() == 'quit':
+            break

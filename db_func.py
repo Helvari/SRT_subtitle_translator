@@ -125,7 +125,6 @@ class DatabaseManager:
                 for subtitle_index, translated_text in translations:
                     if update_translations:
                         # print(f"Updating subtitle_index={subtitle_index} with new translation")
-                        # Päivitetään kaikki käännökset
                         cursor.execute('''
                             UPDATE translations
                             SET translated_text = ?
@@ -133,7 +132,6 @@ class DatabaseManager:
                         ''', (translated_text, subtitle_index))
                     else:
                         # print(f"Writing new translation only for subtitle_index={subtitle_index}")
-                        # Päivitetään vain uudet käännökset
                         cursor.execute('''
                             UPDATE translations
                             SET translated_text = ?

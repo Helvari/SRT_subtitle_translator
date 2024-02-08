@@ -1,7 +1,7 @@
 import openai
 from dotenv import load_dotenv
 import os
-from database import DatabaseConnection, DatabaseManager
+from db_func import DatabaseConnection, DatabaseManager
 
 load_dotenv()
 client = openai.OpenAI()
@@ -22,19 +22,14 @@ class Translator:
         self.batch_size = batch_size
         self.failed_translations = []
 
-        # Luo DatabaseManager-olio ja tarkista tietokannan olemassaolo
         self.database_manager = DatabaseManager(self.db_path, self.overwrite_translations)
 
         if not self.database_manager.check_if_table_exists():
-            # Luo tietokanta ja taulu, jos sitä ei ole vielä olemassa
             self.database_manager.create_table()
-            # Lue ja tallenna tiedoston sisältö tietokantaan, koska tietokanta luotiin juuri
             self.read_and_store_srt(file_path)
         else:
-            # Jos tietokanta on jo olemassa, ei tarvitse lukea tiedostoa uudelleen
             pass
 
-        # Aseta oletusarvoinen indeksiväli, jos sitä ei ole annettu
         if index_range is None:
             start_index, end_index = self.calculate_default_index_range()
             self.index_range = f"{start_index}-{end_index}" if start_index is not None else "1-50"
@@ -50,7 +45,6 @@ class Translator:
             return None
 
     def read_and_store_srt(self, file_path):
-        # Tarkista, onko tietokannassa jo tietoja tästä tiedostosta
         if self.database_manager.check_if_data_exists():
             print("Tietokannassa on jo tiedot tästä tiedostosta. Lukemista ei suoriteta uudelleen.")
             return
@@ -66,42 +60,42 @@ class Translator:
                 timestamp = parts[1]
                 original_text = '\n'.join(parts[2:])
 
-                # Tallenna tiedot tietokantaan
                 self.database_manager.save_to_db(subtitle_index, timestamp, original_text)
 
     def is_translation_valid(self, original, translated):
         original_blocks = original.split('\n\n')
         translated_blocks = translated.split('\n\n')
 
-        # Tarkista blokkien määrä
         if len(original_blocks) != len(translated_blocks):
             return False
 
-        # Tarkista rivien määrä blokeissa
         for trans_block in translated_blocks:
             trans_line_count = trans_block.count('\n')
-            if trans_line_count > 2:  # Kolme riviä, koska rivinvaihtoja on aina yksi vähemmän kuin rivejä
+            if trans_line_count > 2:
                 return False
 
         return True
 
     def translate(self, original_text, subtitle_index):
         max_attempts = 3
-        context = self.database_manager.get_translation_from_index(subtitle_index - 1)  # Hae viimeisin käännetty teksti
+        context = self.database_manager.get_translation_from_index(
+            subtitle_index - 1)
 
         for attempt in range(max_attempts):
             try:
                 prompt = (
-                    f"Translate the following subtitles from their original language into {self.target_lang} for the movie '{self.movie_name}', "
-                    f"while preserving the context between sentences. Ensure that your translation is accurate, "
-                    f"maintains the same meaning and emotion as the original text, and is natural for {self.target_lang} speakers. "
-                    f"Keep the structure, tone, and letter casing as in the original. Pay special attention to the context and flow between sentences, "
-                    f"ensuring that the translated subtitles reflect the continuity of dialogue and narrative. "
-                    f"Translate each subtitle block separately, keeping the same number of blocks, newlines, and character sizes as in the original subtitles."
+                    f"Translate the following subtitles from their original language to {self.target_lang} for the movie '{self.movie_name}', "
+                    f"while preserving the context between sentences. Aim for an accurate translation that not only maintains the original text's meaning and emotion, "
+                    f"but also uses genre-specific terminology and expressions appropriate for the film. Be natural and fluent for speakers of {self.target_lang}. "
+                    f"Keep the structure, tone, and letter casing as in the original. "
+                    f"Pay special attention to context and the flow between sentences, ensuring that the translated subtitles reflect the continuity of dialogue and narrative. "
+                    f"Do not repeat the same text between text blocks. "
+                    "Be precise and subtle in your translations, using liberties only as necessary to ensure the text's naturalness and fluency in the target language. "
+                    "Incorporate genre-specific terms and expressions when appropriate to enhance the authenticity and richness of the translation.\n\n"
                     f"Previous translation (for context): {context}\n\n"
                 )
                 response = client.chat.completions.create(
-                    model="gpt-3.5-turbo",
+                    model="gpt-4-0125-preview",
                     messages=[
                         {"role": "system", "content": prompt},
                         {"role": "user", "content": original_text}
@@ -113,15 +107,15 @@ class Translator:
                     return translated_text
                 else:
                     if attempt < max_attempts:
-                        print(f"Käännösyritys {attempt + 1} tekstille: {original_text[:30]}...")  # Seuraava yritys
+                        print(f"Attempt {attempt + 1} for text: {original_text[:30]}...")
                     else:
                         if attempt == max_attempts:
                             self.store_failed_translation(subtitle_index)
                             print("Translation has too many lines or does not match the original. Skipping...")
-                            break  # Exit the loop if max attempts are reached
+                            break
 
             except openai.APIError as e:
-                print(f"OpenAI API returned an API Error: {e}")
+                print(f"OpenAI API returned an error: {e}")
                 return None
 
     def store_failed_translation(self, subtitle_index):
@@ -155,6 +149,22 @@ class Translator:
         print(f"Käännetyt tekstitykset tallennettu tiedostoon: {translated_file_path}")
 
     def get_user_input(self, default_index_range):
+        load_dotenv()
+        default_file_path = os.getenv('FILE_PATH', None)
+
+
+        '''file_path_input = input(
+            f"Enter the file path or press Enter to use the default ({default_file_path}): ").strip()
+        file_path = file_path_input if file_path_input else default_file_path
+        print(f"Using file path: {file_path}\n")
+
+        while True:
+            action_choice = input("Press 1 to adjust timing, 2 to start translation: ").strip()
+            if action_choice in ['1', '2']:
+                break
+            else:
+                print("Invalid choice, please press 1 or 2.")'''
+
         while True:
             index_range_input = input(
                 f"Enter index range in format 'start-end' (default {default_index_range}): ").strip()
@@ -170,13 +180,11 @@ class Translator:
             print(f"Setting overwrite_translations to {overwrite_translations}\n")
 
             if '-' in index_range:
-                # Jos käyttäjän antama arvo on indeksiväli, kutsutaan process_index_range-funktiota.
                 valid, start_index, end_index = self.check_index_range(index_range)
                 if valid:
-                    index_range = f"{start_index}-{end_index}"  # Aseta uusi end_index
+                    index_range = f"{start_index}-{end_index}"
                     break
             else:
-                # Jos käyttäjän antama arvo on yksittäinen indeksi, kutsutaan process_single_index-funktiota.
                 if self.check_single_index(index_range):
                     break
 
@@ -192,7 +200,7 @@ class Translator:
                 print(f"End_index is too big, setting default to {max_index}")
             elif start_index > end_index or start_index < 0:
                 raise ValueError
-            return True, start_index, end_index  # Indeksiväli on kelvollinen
+            return True, start_index, end_index
         except ValueError:
             print("Invalid index range. Please enter a valid range like 'x-y', where x <= y.")
             return False
@@ -204,7 +212,7 @@ class Translator:
             single_index = int(index_range)
             if single_index < 0 or single_index > max_index:
                 raise ValueError
-            return True  # Yksittäinen indeksi on kelvollinen
+            return True
         except ValueError:
             print("Invalid index. Please enter a valid single index.")
             return False
@@ -214,12 +222,12 @@ class Translator:
         for part in index_range.split(','):
             part = part.strip()
             if '-' in part:
-                self.index_range.append(part)  # Lisää indeksiväli suoraan
+                self.index_range.append(part)
             else:
                 try:
                     single_index = int(part)
                     self.index_range.append(
-                        f"{single_index}-{single_index}")  # Muunna yksittäinen indeksi indeksiväliksi
+                        f"{single_index}-{single_index}")
                 except ValueError:
                     print(f"Invalid index: {part}")
 
@@ -236,11 +244,10 @@ class Translator:
             next_index = min(current_index + batch_size - 1, end_index)
             print(f"Käännös riveille {current_index}-{next_index}...")
 
-            # Hae rivit riippuen overwrite_translations-arvosta
-            rows_to_translate = self.database_manager.fetch_rows_to_translate(current_index, next_index, self.overwrite_translations)
+            rows_to_translate = self.database_manager.fetch_rows_to_translate(current_index, next_index,
+                                                                              self.overwrite_translations)
             # print(rows_to_translate)
 
-            # Suorita käännökset ja kerää niiden tiedot
             for subtitle_index, original_text in rows_to_translate:
                 translated_text = self.translate(original_text, subtitle_index)
                 translations_to_update.append((subtitle_index, translated_text))
@@ -248,36 +255,27 @@ class Translator:
                 translations_count += 1
                 if translations_count >= commit_interval or next_index == end_index:
                     self.database_manager.update_database(translations_to_update, overwrite_translations)
-                    translations_to_update = []  # Tyhjennä lista uusia käännöksiä varten
+                    translations_to_update = []
                     translations_count = 0
 
             current_index = next_index + 1
 
-        # Päivitä jäljelle jäävät käännökset
         if translations_to_update:
             self.database_manager.update_database(translations_to_update)
 
     def process_srt(self, overwrite_translations):
-        # Print a message indicating the start of the translation process.
         print("\nAloitetaan kääntäminen...\n")
 
         try:
-            # Iterate through each index range specified in self.index_range.
             for index_range in self.index_range:
-                # Split the index range string into start and end indexes and convert them to integers.
                 start_index, end_index = map(int, index_range.split('-'))
-                # Print a message indicating the current index range being processed.
                 print(f"Käsitellään indeksiväliä {start_index}-{end_index}...\n")
-                # Process and translate the subtitles for the current index range.
                 self.process_and_translate_range(start_index, end_index,
                                                  self.batch_size, overwrite_translations)
 
-            # Create a new .srt file with the translated subtitles.
             self.create_translated_srt()
 
-            # Print a list of indexes where translations failed.
             print("Virheelliset käännökset: " + ', '.join(self.failed_translations))
 
         except ValueError:
-            # Print an error message if an invalid input is encountered.
             print("Virheellinen syöte.")
