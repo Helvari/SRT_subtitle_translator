@@ -2,9 +2,34 @@ import openai
 from dotenv import load_dotenv
 import os
 from db_func import DatabaseConnection, DatabaseManager
+import re
 
 load_dotenv()
 client = openai.OpenAI()
+
+
+def is_translation_valid(original, translated):
+    original_blocks = original.split('\n\n')
+    translated_blocks = translated.split('\n\n')
+
+    if len(original_blocks) != len(translated_blocks):
+        return False
+
+    for trans_block in translated_blocks:
+        trans_line_count = trans_block.count('\n')
+        if trans_line_count > 2:
+            return False
+
+    return True
+
+
+def read_srt(file_path):
+    try:
+        with open(file_path, 'r', encoding='ISO-8859-1') as file:
+            return file.read()
+    except FileNotFoundError:
+        print("File not found:", file_path)
+        return None
 
 
 class Translator:
@@ -36,20 +61,12 @@ class Translator:
         else:
             self.index_range = index_range
 
-    def read_srt(self, file_path):
-        try:
-            with open(file_path, 'r', encoding='ISO-8859-1') as file:
-                return file.read()
-        except FileNotFoundError:
-            print("File not found:", file_path)
-            return None
-
     def read_and_store_srt(self, file_path):
         if self.database_manager.check_if_data_exists():
             print("Tietokannassa on jo tiedot tästä tiedostosta. Lukemista ei suoriteta uudelleen.")
             return
 
-        srt_content = self.read_srt(file_path)
+        srt_content = read_srt(file_path)
         if srt_content is None:
             return
 
@@ -61,20 +78,6 @@ class Translator:
                 original_text = '\n'.join(parts[2:])
 
                 self.database_manager.save_to_db(subtitle_index, timestamp, original_text)
-
-    def is_translation_valid(self, original, translated):
-        original_blocks = original.split('\n\n')
-        translated_blocks = translated.split('\n\n')
-
-        if len(original_blocks) != len(translated_blocks):
-            return False
-
-        for trans_block in translated_blocks:
-            trans_line_count = trans_block.count('\n')
-            if trans_line_count > 2:
-                return False
-
-        return True
 
     def translate(self, original_text, subtitle_index):
         max_attempts = 3
@@ -95,7 +98,7 @@ class Translator:
                     f"Previous translation (for context): {context}\n\n"
                 )
                 response = client.chat.completions.create(
-                    model="gpt-4-0125-preview",
+                    model="gpt-3.5-turbo-0125",
                     messages=[
                         {"role": "system", "content": prompt},
                         {"role": "user", "content": original_text}
@@ -103,7 +106,7 @@ class Translator:
                 )
                 translated_text = response.choices[0].message.content
 
-                if self.is_translation_valid(original_text, translated_text):
+                if is_translation_valid(original_text, translated_text):
                     return translated_text
                 else:
                     if attempt < max_attempts:
@@ -134,8 +137,21 @@ class Translator:
         return start_index, end_index
 
     def create_translated_srt(self):
-        translated_file_name = f"{self.movie_name}_{self.target_lang.upper() + 'SUB'}.srt"
-        translated_file_path = os.path.join(os.path.dirname(self.db_path), translated_file_name)
+        # Oletetaan, että self.movie_name sisältää tiedostonimen ilman .srt päätettä
+        # Etsitään mahdollinen kielikoodi tiedostonimen lopusta
+        pattern = re.compile(r"(.+?)(?:\.([a-z]{2}))?\.srt$", re.IGNORECASE)
+        match = pattern.match(self.movie_name)
+
+        if match:
+            # Otetaan tiedoston perusnimi ja mahdollinen kielikoodi
+            base_name, current_lang = match.groups()
+            # Jos alkuperäisessä tiedostonimessä ei ole kielikoodia, current_lang on None
+            new_file_name = f"{base_name}.{self.target_lang}.srt"
+        else:
+            # Jos tiedostonimi ei vastaa odotettua muotoa, käytetään alkuperäistä logiikkaa
+            new_file_name = f"{self.movie_name}.{self.target_lang}.srt"
+
+        translated_file_path = os.path.join(os.path.dirname(self.db_path), new_file_name)
 
         with DatabaseConnection(self.db_path) as conn:
             cursor = conn.cursor()

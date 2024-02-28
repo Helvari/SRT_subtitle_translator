@@ -7,7 +7,7 @@ def main():
     load_dotenv()
 
     file_path = os.getenv('FILE_PATH')
-    target_lang = "fin"
+    target_lang = "fi"
 
     translator = Translator(file_path, target_lang)
     default_index_range = translator.index_range
