@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from translator import Translator
+from openai_translator import Translator
 
 
 def main():

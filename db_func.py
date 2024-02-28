@@ -1,4 +1,5 @@
 import sqlite3
+import os
 
 
 class DatabaseConnection:
@@ -14,9 +15,10 @@ class DatabaseConnection:
 
 
 class DatabaseManager:
-    def __init__(self, db_path, overwrite_translations):
+    def __init__(self, db_path, overwrite_translations, file_path):
         self.overwrite_translations = overwrite_translations
         self.db_path = db_path
+        self.file_path = file_path
 
     def create_table(self):
         try:
@@ -140,3 +142,25 @@ class DatabaseManager:
                 conn.commit()
         except Exception as e:
             print(f"Virhe tietokannan päivittämisessä: {e}")
+
+    def create_temp_text_file(self):
+        temp_file_path = os.path.join(os.path.dirname(self.file_path), 'temp_text.txt')
+
+        # Tarkistetaan, onko tiedosto olemassa.
+        if not os.path.exists(temp_file_path):
+            try:
+                with DatabaseConnection(self.db_path) as conn:
+                    cursor = conn.cursor()
+                    cursor.execute('SELECT original_text FROM translations')
+                    original_texts = cursor.fetchall()
+
+                    with open(temp_file_path, 'w', encoding='utf-8') as file:
+                        for original_text in original_texts:
+                            # Varmista, että tekstiä on olemassa ennen kirjoittamista
+                            if original_text[0]:
+                                file.write(f"{original_text[0]}\n\n")
+                print(f"Original teksti on tallennettu tiedostoon: {temp_file_path}")
+            except Exception as e:
+                print(f"Virhe luotaessa väliaikaista tekstiedostoa: {e}")
+        else:
+            print(f"Tiedosto {temp_file_path} on jo olemassa, ei luoda uudelleen.")

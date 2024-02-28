@@ -1,7 +1,7 @@
 import openai
 from dotenv import load_dotenv
 import os
-from db_func import DatabaseConnection, DatabaseManager
+from db_func import DatabaseManager
 import re
 
 load_dotenv()
@@ -25,7 +25,7 @@ def is_translation_valid(original, translated):
 
 def read_srt(file_path):
     try:
-        with open(file_path, 'r', encoding='ISO-8859-1') as file:
+        with open(file_path, 'r', encoding='utf-8') as file:
             return file.read()
     except FileNotFoundError:
         print("File not found:", file_path)
@@ -47,7 +47,7 @@ class Translator:
         self.batch_size = batch_size
         self.failed_translations = []
 
-        self.database_manager = DatabaseManager(self.db_path, self.overwrite_translations)
+        self.database_manager = DatabaseManager(self.db_path, self.overwrite_translations, self.file_path)
 
         if not self.database_manager.check_if_table_exists():
             self.database_manager.create_table()
