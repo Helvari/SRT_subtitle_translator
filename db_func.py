@@ -15,10 +15,11 @@ class DatabaseConnection:
 
 
 class DatabaseManager:
-    def __init__(self, db_path, overwrite_translations, file_path):
+    def __init__(self, db_path, overwrite_translations, file_path, index_range=None):
         self.overwrite_translations = overwrite_translations
         self.db_path = db_path
         self.file_path = file_path
+        self.index_range = index_range
 
     def create_table(self):
         try:
@@ -139,6 +140,26 @@ class DatabaseManager:
                             SET translated_text = ?
                             WHERE subtitle_index = ? AND translated_text IS NULL;
                         ''', (translated_text, subtitle_index))
+                conn.commit()
+        except Exception as e:
+            print(f"Virhe tietokannan päivittämisessä: {e}")
+
+    def update_database_deepl(self, translated_file_path):
+        # Lue käännetty teksti tiedostosta
+        with open(translated_file_path, 'r', encoding='utf-8') as file:
+            translated_texts = file.read().strip().split('\n\n')
+
+        # Päivitä käännetyt tekstit tietokantaan
+        try:
+            with DatabaseConnection(self.db_path) as conn:
+                cursor = conn.cursor()
+                for i, translated_text in enumerate(translated_texts, start=1):
+                    # Päivitä translated_text tietokantaan olettaen, että subtitle_index alkaa 1:stä
+                    cursor.execute('''
+                        UPDATE translations
+                        SET translated_text = ?
+                        WHERE subtitle_index = ?;
+                    ''', (translated_text, i))
                 conn.commit()
         except Exception as e:
             print(f"Virhe tietokannan päivittämisessä: {e}")

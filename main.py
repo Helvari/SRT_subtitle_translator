@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from openai_translator import Translator
+from translator_class import Translator
 
 
 def main():
@@ -14,8 +14,6 @@ def main():
     index_range, batch_size, overwrite_translations = translator.get_user_input(default_index_range)
     translator.set_parameters(index_range, batch_size, overwrite_translations)
     translator.process_srt(overwrite_translations)
-
-    pass
 
 
 if __name__ == "__main__":
