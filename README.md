@@ -1,6 +1,3 @@
-WIP WIP WIP WIP WIP WIP WIP WIP WIP WIP WIP WIP WIP WIP WIP WIP WIP WIP WIP WIP WIP WIP WIP WIP WIP
-
-
 # SRT Subtitle Translator
 
 ## Overview
@@ -28,9 +25,9 @@ SRT Subtitle Translator is a Python-based tool designed to automate the process 
 2. Install the required dependencies with pip install -r requirements.txt.
 3. Set up an .env file in the root directory with the following contents:
 
-OPENAI_API_KEY='your_openai_api_key'
-DEEPL_API_KEY='your_deepl_api_key'
-FILE_PATH='path_to_your_srt_file'
+  - OPENAI_API_KEY='your_openai_api_key'
+  - DEEPL_API_KEY='your_deepl_api_key'
+  - FILE_PATH='path_to_your_srt_file'
 
 4. Ensure that the .env file is in the same directory as your main script.
 
@@ -42,4 +39,8 @@ Follow the on-screen prompts to select the translation service and specify trans
 
 Type quit at any prompt to exit the application.
 
-WIP WIP WIP WIP WIP WIP WIP WIP WIP WIP WIP WIP WIP WIP WIP WIP WIP WIP WIP WIP WIP WIP WIP WIP WIP
+
+# Personal Project Notice
+This program represents my first personal project and has been developed primarily for learning purposes. It is a reflection of my journey in software development, embodying the challenges and achievements I have encountered along the way.
+
+As such, please note that the program is not perfect and may contain bugs or incomplete features. My main goal was to learn and grow from the experience of building it from scratch. I have decided to share it publicly not as a polished piece of software, but as a personal milestone and a stepping stone towards further learning and improvement.
