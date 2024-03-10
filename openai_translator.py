@@ -5,7 +5,7 @@ load_dotenv()
 client = openai.OpenAI()
 
 
-def translate(original_text, target_lang, movie_name, context):
+def translate_openai(original_text, target_lang, movie_name, context):
     # print(original_text, target_lang, movie_name, subtitle_index, context)
     print(context)
 
