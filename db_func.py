@@ -1,6 +1,7 @@
 import sqlite3
 import os
 
+
 class DatabaseConnection:
     def __init__(self, db_path):
         # Initialize the database connection with the provided database path
@@ -74,10 +75,9 @@ class DatabaseManager:
         except Exception as e:
             print(f"Error saving data to database: {e}")
 
-    def save_translations_to_srt(self, translations_folder, target_lang):
-        # Save translated subtitles to an SRT file
-        base_name = os.path.splitext(os.path.basename(self.file_path))[0]
-        new_file_name = f"{base_name}.{target_lang}.srt"
+    def save_translations_to_srt(self, target_lang, movie_name, translations_folder):
+        # Luo uusi tiedostonimi elokuvan nimen ja kohdekielen perusteella
+        new_file_name = f"{movie_name}.{target_lang}.srt"
         translated_file_path = os.path.join(translations_folder, new_file_name)
 
         try:

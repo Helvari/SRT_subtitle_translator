@@ -186,22 +186,8 @@ class Translator:
         return start_index, end_index
 
     def create_translated_srt(self):
-        # Construct the filename for the translated subtitles using the movie name and target language
-        # This filename format includes the movie's original name followed by the target language code and the .srt extension
-        new_file_name = f"{self.movie_name}.{self.target_lang}.srt"
-        # Create the full path for the new SRT file by combining the translations directory path and the new file name
-        translated_file_path = os.path.join(self.translations_path, new_file_name)
-
-        # Attempt to save the translations into the newly named SRT file
-        try:
-            # This calls a method on the database manager object to extract translated text from the database
-            # and write it to the SRT file format at the specified path
-            self.database_manager.save_translations_to_srt(translated_file_path)
-            # If successful, print a confirmation message with the path to the new SRT file
-            print(f"Translated subtitles saved to file: {translated_file_path}")
-        except Exception as e:
-            # If an error occurs during the save process, print an error message
-            print(f"Error saving translations to file: {e}")
+        # Suorita tallennustoiminto suoraan DatabaseManager-olion kautta
+        self.database_manager.save_translations_to_srt(self.target_lang, self.movie_name, self.translations_path)
 
     def get_user_input(self, default_index_range):
 
